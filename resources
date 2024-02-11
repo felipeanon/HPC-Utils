@@ -1,7 +1,11 @@
 #!/bin/bash
 
+down_nodes=()
 gran_total=0
 gran_use=0
+down_cores=0
+total_nodes=0
+
 while read line
 do
   name=$(echo ${line##*NodeName=} | awk '{print $1}')
@@ -9,12 +13,22 @@ do
   total=$(echo ${line##*CPUTot=} | awk '{print $1}')
   state=$(echo ${line##*State=} | awk '{print $1}')
 
+  if [[ "$state" == "DOWN" || "$state" == "DOWN"* ]]; then
+    down_nodes+=("$name")
+    down_cores=$((down_cores + total))
+  else
+    gran_total=$(( gran_total + total ))
+    gran_use=$(( gran_use + use ))
+  fi
 
-  gran_total=$(( gran_total + total ))
-  gran_use=$(( gran_use + use ))
+  total_nodes=$(( total_nodes + 1 ))
 
-  #echo -e "$name ($state) \t $use cores in use - $((total - use)) cores free"
   printf '%s %-20s %2s cores in use - %2s cores free\n' $name $state $use $((total - use))
+
 done <<< "$(scontrol show nodes -o)"
 
-echo A total of $gran_use cores used from the $gran_total available, usage = $(( 100*(gran_use)/(gran_total) ))%
+down_node_count=${#down_nodes[@]}
+down_percentage=$(( (down_node_count * 100) / total_nodes ))
+
+echo "A total of $gran_use cores used from the $gran_total available, usage = $(( 100*(gran_use)/(gran_total) ))%"
+echo "Total cores down: $down_cores, percentage of nodes down: $down_percentage%"
